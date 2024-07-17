@@ -97,6 +97,7 @@ public class ChatGPTBot extends TelegramLongPollingBot {
                 return freeSubscription;
             });
 
+
             Optional<ChatUsage> optionalChatUsage = Optional.ofNullable(chatUsageService.findByUserIdAndChatVersion(user.getId(), "v1"));
             ChatUsage chatUsage = optionalChatUsage.orElseGet(() -> {
                 ChatUsage newChatUsage = new ChatUsage();
