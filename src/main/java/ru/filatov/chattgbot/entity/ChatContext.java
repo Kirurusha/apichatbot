@@ -35,8 +35,8 @@ public class ChatContext {
         this.messages = new LinkedList<>();
     }
 
-    public void updateUserMessages(String role, String content) {
-        addMessage(content, role);
+    public List<Message> getMessages() {
+        return messages;
     }
 
     public void addMessage(String messageContent, String role) {

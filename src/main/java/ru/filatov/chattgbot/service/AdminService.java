@@ -32,26 +32,7 @@ public class AdminService {
         return userOpt.isPresent() && userOpt.get().getRole().equalsIgnoreCase("ADMIN");
     }
 
-    public void setTokenLimit(Long userId, int tokenLimitSent, int tokenLimitReceived) {
-        User user = userRepository.findById(userId).orElse(null);
-        if (user != null) {
-            user.getSubscriptions().forEach(subscription -> {
-                subscription.setTokenLimitSent(tokenLimitSent);
-                subscription.setTokenLimitReceived(tokenLimitReceived);
-            });
-            userRepository.save(user);
-        }
-    }
 
-    public void setRequestLimit(Long userId, int requestLimit) {
-        User user = userRepository.findById(userId).orElse(null);
-        if (user != null) {
-            user.getSubscriptions().forEach(subscription -> {
-                subscription.setRequestLimit(requestLimit);
-            });
-            userRepository.save(user);
-        }
-    }
 
     // Новые методы для установки и снятия админских прав
     public void grantAdminRights(Long userId) {

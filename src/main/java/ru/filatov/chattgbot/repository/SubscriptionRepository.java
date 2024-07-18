@@ -13,9 +13,7 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     List<Subscription> findByUserId(Long userId);
     List<Subscription> findByUserIdAndEndDateAfter(Long userId, LocalDateTime endDate);
 
-    Subscription findTopByUserIdAndEndDateAfterOrderByEndDateDesc(Long userId, LocalDateTime now);
-
-    Optional<Subscription> findFirstByUserIdAndEndDateAfterOrderByEndDateDesc(Long userId, LocalDateTime endDate);
+    Optional<Subscription> findFirstByUserIdAndEndDateAfterAndModelNameOrderByEndDateDesc(Long userId, LocalDateTime endDate, String modelName);
 
     @Query("SELECT COUNT(cu) FROM ChatUsage cu WHERE cu.user.id = :userId AND cu.chatVersion = :chatVersion AND cu.lastActivity >= :startDate")
     int countRequestsMadeInCurrentPeriod(@Param("userId") Long userId, @Param("chatVersion") String chatVersion, @Param("startDate") LocalDateTime startDate);
@@ -26,4 +24,6 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
     @Query("SELECT SUM(cu.tokensReceived) FROM ChatUsage cu WHERE cu.user.id = :userId AND cu.chatVersion = :chatVersion AND cu.lastActivity >= :startDate")
     int countTokensReceivedInCurrentPeriod(@Param("userId") Long userId, @Param("chatVersion") String chatVersion, @Param("startDate") LocalDateTime startDate);
 
+    @Query("SELECT COUNT(cu) FROM ChatUsage cu WHERE cu.user.id = :userId AND cu.lastActivity >= :startDate")
+    int countRequestsMadeInCurrentPeriod(@Param("userId") Long userId, @Param("startDate") LocalDateTime startDate);
 }

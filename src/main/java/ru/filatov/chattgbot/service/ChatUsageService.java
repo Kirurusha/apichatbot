@@ -16,9 +16,11 @@ import java.util.stream.Collectors;
 public class ChatUsageService {
     @Autowired
     private ChatUsageRepository chatUsageRepository;
+    private final SubscriptionService subscriptionService;
 
-    @Autowired
-    private SubscriptionService subscriptionService;
+    public ChatUsageService(SubscriptionService subscriptionService) {
+        this.subscriptionService = subscriptionService;
+    }
 
     private static final int BASE_TOKEN_LIMIT_SENT = 1000;
     private static final int BASE_TOKEN_LIMIT_RECEIVED = 1000;
@@ -48,9 +50,9 @@ public class ChatUsageService {
         }
 
         Subscription subscription = chatUsage.getSubscription();
-        int tokenLimitSent = (subscription != null) ? subscription.getTokenLimitSent() : BASE_TOKEN_LIMIT_SENT;
-        int tokenLimitReceived = (subscription != null) ? subscription.getTokenLimitReceived() : BASE_TOKEN_LIMIT_RECEIVED;
-        int requestLimit = (subscription != null) ? subscription.getRequestLimit() : BASE_REQUEST_LIMIT;
+        int tokenLimitSent = (subscription != null) ? subscription.getTotalTokenLimitSent() : BASE_TOKEN_LIMIT_SENT;
+        int tokenLimitReceived = (subscription != null) ? subscription.getTotalTokenLimitReceived() : BASE_TOKEN_LIMIT_RECEIVED;
+        int requestLimit = (subscription != null) ? subscription.getTotalRequestLimit() : BASE_REQUEST_LIMIT;
 
         if (chatUsage.getTokensSent() + tokensSent > tokenLimitSent ||
                 chatUsage.getTokensReceived() + tokensReceived > tokenLimitReceived ||
@@ -66,7 +68,6 @@ public class ChatUsageService {
         return true;
     }
 
-    // Метод для получения статистики по пользователю
     public String getUserStatistics(Long userId) {
         List<ChatUsage> chatUsages = findByUserId(userId);
         if (chatUsages.isEmpty()) {
@@ -77,11 +78,28 @@ public class ChatUsageService {
         int totalTokensReceived = chatUsages.stream().mapToInt(ChatUsage::getTokensReceived).sum();
         int totalRequestsMade = chatUsages.stream().mapToInt(ChatUsage::getRequestsMade).sum();
 
-        return String.format("User ID: %d\nTotal Tokens Sent: %d\nTotal Tokens Received: %d\nTotal Requests Made: %d",
-                userId, totalTokensSent, totalTokensReceived, totalRequestsMade);
+        // Предположим, что у пользователя может быть подписка на текущую модель
+        String modelName = chatUsages.get(0).getChatVersion(); // Предполагаем, что у всех usage одна и та же модель
+        Optional<Subscription> activeSubscriptionOpt = subscriptionService.findActiveSubscriptionByUserId(userId, modelName);
+        String subscriptionInfo;
+        if (activeSubscriptionOpt.isPresent()) {
+            Subscription subscription = activeSubscriptionOpt.get();
+            subscriptionInfo = String.format("Subscription: %s\nStart Date: %s\nEnd Date: %s\nRequest Limit: %d\nToken Limit Sent: %d\nToken Limit Received: %d\n",
+                    subscription.getSubscriptionType(),
+                    subscription.getStartDate(),
+                    subscription.getEndDate(),
+                    subscription.getTotalRequestLimit(),
+                    subscription.getTotalTokenLimitSent(),
+                    subscription.getTotalTokenLimitReceived());
+        } else {
+            subscriptionInfo = "Subscription: None\n";
+        }
+
+        return String.format("User ID: %d\nTotal Tokens Sent: %d\nTotal Tokens Received: %d\nTotal Requests Made: %d\n%s",
+                userId, totalTokensSent, totalTokensReceived, totalRequestsMade, subscriptionInfo);
     }
 
-    // Метод для получения общей статистики по всем пользователям
+
     public String getAllUsersStatistics() {
         List<ChatUsage> chatUsages = chatUsageRepository.findAll();
 
@@ -110,17 +128,19 @@ public class ChatUsageService {
 
             statsBuilder.append(String.format("\nUser: %s (ID: %d) (Telegram_ID: %d)\n", user.getUsername(), user.getId(), user.getTelegramId()));
 
-            // Получение подписки пользователя
-            Optional<Subscription> subscriptionOpt = subscriptionService.findActiveSubscriptionByUserId(user.getId());
-            if (subscriptionOpt.isPresent()) {
-                Subscription subscription = subscriptionOpt.get();
-                statsBuilder.append(String.format("Subscription: %s\nStart Date: %s\nEnd Date: %s\nRequest Limit: %d\nToken Limit Sent: %d\nToken Limit Received: %d\n",
-                        subscription.getSubscriptionType(),
-                        subscription.getStartDate(),
-                        subscription.getEndDate(),
-                        subscription.getRequestLimit(),
-                        subscription.getTokenLimitSent(),
-                        subscription.getTokenLimitReceived()));
+            // Получаем все активные подписки пользователя
+            List<Subscription> subscriptions = subscriptionService.findByUserId(user.getId());
+            if (!subscriptions.isEmpty()) {
+                for (Subscription subscription : subscriptions) {
+                    statsBuilder.append(String.format("Subscription: %s\nModel: %s\nStart Date: %s\nEnd Date: %s\nRequest Limit: %d\nToken Limit Sent: %d\nToken Limit Received: %d\n",
+                            subscription.getSubscriptionType(),
+                            subscription.getModelName(),
+                            subscription.getStartDate(),
+                            subscription.getEndDate(),
+                            subscription.getTotalRequestLimit(),
+                            subscription.getTotalTokenLimitSent(),
+                            subscription.getTotalTokenLimitReceived()));
+                }
             } else {
                 statsBuilder.append("Subscription: None\n");
             }
@@ -143,4 +163,5 @@ public class ChatUsageService {
 
         return statsBuilder.toString();
     }
+
 }

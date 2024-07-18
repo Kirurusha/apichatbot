@@ -8,8 +8,10 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ru.filatov.chattgbot.entity.*;
 import ru.filatov.chattgbot.service.*;
+import ru.filatov.chattgbot.utils.MessageUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -72,9 +74,10 @@ public class ChatGPTBot extends TelegramLongPollingBot {
                 newUser.setUsername(username);
                 newUser.setCreatedAt(LocalDateTime.now());
                 newUser.setUpdatedAt(LocalDateTime.now());
+                newUser.setModel("gpt-3.5-turbo-0125");
                 newUser.setActive(true);
                 newUser.setRole("USER");
-                newUser.setAdmin(true);
+                newUser.setAdmin(false);
                 userService.save(newUser);
                 log.info("New user created: {}", username);
                 return newUser;
@@ -90,19 +93,20 @@ public class ChatGPTBot extends TelegramLongPollingBot {
                 return newChatContext;
             });
 
-            Optional<Subscription> optionalSubscription = subscriptionService.findActiveSubscriptionByUserId(user.getId());
+            Optional<Subscription> optionalSubscription = subscriptionService.findActiveSubscriptionByUserId(user.getId(),user.getModel());
             Subscription subscription = optionalSubscription.orElseGet(() -> {
                 Subscription freeSubscription = subscriptionService.createFreeSubscriptionForUser(user);
                 log.info("Free subscription created for user: {}", username);
                 return freeSubscription;
             });
 
-            Optional<ChatUsage> optionalChatUsage = Optional.ofNullable(chatUsageService.findByUserIdAndChatVersion(user.getId(), "v1"));
+            Optional<ChatUsage> optionalChatUsage = Optional.ofNullable(chatUsageService.findByUserIdAndChatVersion(user.getId(), user.getModel()));
             ChatUsage chatUsage = optionalChatUsage.orElseGet(() -> {
                 ChatUsage newChatUsage = new ChatUsage();
                 newChatUsage.setUser(user);
-                newChatUsage.setChatVersion("gpt-3.5-turbo-0125");
+                newChatUsage.setChatVersion(user.getModel());
                 newChatUsage.setLastActivity(LocalDateTime.now());
+                newChatUsage.setSubscription(subscription);
                 newChatUsage.setRequestsMade(0);
                 newChatUsage.setTokensReceived(0);
                 newChatUsage.setTokensSent(0);
@@ -124,7 +128,7 @@ public class ChatGPTBot extends TelegramLongPollingBot {
                 response = commandHandler.sendMessage(telegramId, userMessage);
             }
 
-            sendMessage(chatId, response);
+            sendMessage(Long.valueOf(chatId), response);
         }
     }
 
@@ -143,15 +147,34 @@ public class ChatGPTBot extends TelegramLongPollingBot {
         return "Received your message: " + userMessage;
     }
 
-    private void sendMessage(String chatId, String text) {
-        SendMessage message = new SendMessage();
-        message.setChatId(chatId);
-        message.setText(text);
-
-        try {
-            execute(message);
-        } catch (TelegramApiException e) {
-            e.printStackTrace();
+    public void sendMessage(Long chatId, String message) {
+        if (message.length() > 4096) {
+            sendLongMessage(chatId, message);
+        } else {
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(chatId.toString());
+            sendMessage.setText(message);
+            try {
+                execute(sendMessage);
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
         }
     }
+
+
+    public void sendLongMessage(Long chatId, String message) {
+        List<String> parts = MessageUtils.splitMessage(message, 4096);
+        for (String part : parts) {
+            SendMessage sendMessage = new SendMessage();
+            sendMessage.setChatId(chatId.toString());
+            sendMessage.setText(part);
+            try {
+                execute(sendMessage);
+            } catch (TelegramApiException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
 }

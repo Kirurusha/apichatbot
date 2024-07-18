@@ -1,8 +1,10 @@
 package ru.filatov.chattgbot.entity;
 
 import lombok.Data;
-
+import lombok.Getter;
+import lombok.Setter;
 import jakarta.persistence.*;
+
 import java.time.LocalDateTime;
 
 @Entity
@@ -19,14 +21,25 @@ public class Subscription {
     @Column(nullable = false)
     private String subscriptionType;
 
+    @Getter
+    @Setter
     @Column(nullable = false)
-    private int tokenLimitSent;
+    private int totalTokenLimitSent;
 
+    @Getter
+    @Setter
     @Column(nullable = false)
-    private int tokenLimitReceived;
+    private int totalTokenLimitReceived;
 
+    @Getter
+    @Setter
     @Column(nullable = false)
-    private int requestLimit;
+    private int totalRequestLimit;
+
+    @Getter
+    @Setter
+    @Column(nullable = false)
+    private String modelName;
 
     @Column(nullable = false)
     private LocalDateTime startDate;
@@ -41,5 +54,12 @@ public class Subscription {
 
     public boolean isActive() {
         return LocalDateTime.now().isBefore(endDate);
+    }
+
+    public void extendSubscription(int additionalDays, int additionalTokenLimitSent, int additionalTokenLimitReceived, int additionalRequestLimit) {
+        this.endDate = this.endDate.plusDays(additionalDays);
+        this.totalTokenLimitSent += additionalTokenLimitSent;
+        this.totalTokenLimitReceived += additionalTokenLimitReceived;
+        this.totalRequestLimit += additionalRequestLimit;
     }
 }
